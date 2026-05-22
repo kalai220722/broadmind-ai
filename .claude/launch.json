@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "broadmind-dev",
-      "runtimeExecutable": "npx",
+      "runtimeExecutable": "/Users/kalairajan/.nvm/versions/node/v20.20.2/bin/npx",
       "runtimeArgs": ["next", "dev", "--port", "3001"],
       "port": 3001
     }
