@@ -38,6 +38,7 @@ const PROVIDERS: Record<
   gemini: { name: "Google Gemini", emoji: "🟢", model: "gemini-2.0-flash" },
   chatgpt: { name: "ChatGPT", emoji: "🟡", model: "gpt-4o-mini" },
   claude: { name: "Claude", emoji: "🟠", model: "claude-sonnet-4-20250514" },
+  groq: { name: "Groq", emoji: "🟣", model: "llama-3.3-70b-versatile" },
   kimi: { name: "Kimi", emoji: "🔵", model: "moonshot-v1-8k" },
 };
 
@@ -108,6 +109,28 @@ async function callClaude(
   return result.content[0].type === "text" ? result.content[0].text : "";
 }
 
+// ── Groq handler (free, fast — Llama 3.3 70B) ─────────────────────
+async function callGroq(
+  messages: { role: string; content: string }[]
+) {
+  const Groq = (await import("groq-sdk")).default;
+  const client = new Groq({ apiKey: process.env.GROQ_API_KEY! });
+
+  const result = await client.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    ],
+    max_tokens: 2000,
+  });
+
+  return result.choices[0].message.content || "";
+}
+
 // ── Kimi handler ────────────────────────────────────────────────────
 async function callKimi(
   messages: { role: string; content: string }[]
@@ -139,6 +162,7 @@ function getAvailableProviders(): string[] {
   if (process.env.GEMINI_API_KEY) available.push("gemini");
   if (process.env.OPENAI_API_KEY) available.push("chatgpt");
   if (process.env.CLAUDE_API_KEY) available.push("claude");
+  if (process.env.GROQ_API_KEY) available.push("groq");
   if (process.env.KIMI_API_KEY) available.push("kimi");
   return available;
 }
@@ -201,6 +225,9 @@ export async function POST(request: NextRequest) {
         break;
       case "claude":
         response = await callClaude(messages);
+        break;
+      case "groq":
+        response = await callGroq(messages);
         break;
       case "kimi":
         response = await callKimi(messages);
