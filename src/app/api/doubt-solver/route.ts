@@ -158,6 +158,8 @@ export async function GET() {
 
 // ── POST: solve a doubt ─────────────────────────────────────────────
 export async function POST(request: NextRequest) {
+  let activeProvider = "unknown";
+
   try {
     const body = await request.json();
     const {
@@ -187,6 +189,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    activeProvider = provider;
     let response: string;
 
     switch (provider) {
@@ -214,18 +217,22 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     const errMsg =
       error instanceof Error ? error.message : "Unknown error occurred";
-    console.error("Doubt solver error:", errMsg);
+    console.error(`${activeProvider} error:`, errMsg);
 
-    // Friendly error messages
+    const providerName = PROVIDERS[activeProvider]?.name || activeProvider;
+
+    // Friendly error messages — show the ACTUAL provider that failed
     let userMessage = errMsg;
-    if (errMsg.includes("quota") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) {
-      userMessage = "⏳ API rate limit reached. The free Gemini tier has a daily quota — please wait a minute and try again, or add a paid API key for unlimited access.";
-    } else if (errMsg.includes("API key") || errMsg.includes("401") || errMsg.includes("403")) {
-      userMessage = "🔑 Invalid API key. Please check your API key in .env.local and restart the server.";
-    } else if (errMsg.includes("network") || errMsg.includes("ENOTFOUND")) {
-      userMessage = "🌐 Network error. Please check your internet connection and try again.";
+    if (errMsg.includes("quota") || errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("insufficient_quota")) {
+      userMessage = `⏳ ${providerName} rate limit or quota reached. Please wait a minute and try again, switch to a different AI model, or upgrade your API key for unlimited access.`;
+    } else if (errMsg.includes("API key") || errMsg.includes("401") || errMsg.includes("403") || errMsg.includes("invalid_api_key")) {
+      userMessage = `🔑 ${providerName} API key is invalid or expired. Please check your API key in .env.local and restart the server.`;
+    } else if (errMsg.includes("network") || errMsg.includes("ENOTFOUND") || errMsg.includes("ECONNREFUSED")) {
+      userMessage = `🌐 Network error connecting to ${providerName}. Please check your internet connection and try again.`;
+    } else {
+      userMessage = `❌ ${providerName} error: ${errMsg}. Try switching to a different AI model.`;
     }
 
-    return Response.json({ error: userMessage }, { status: 500 });
+    return Response.json({ error: userMessage, provider: activeProvider }, { status: 500 });
   }
 }
