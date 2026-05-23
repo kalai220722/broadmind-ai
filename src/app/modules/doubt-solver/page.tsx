@@ -80,7 +80,7 @@ export default function DoubtSolverPage() {
         setProviders({
           gemini: { name: "Google Gemini", emoji: "🟢", model: "gemini-1.5-flash" },
           chatgpt: { name: "ChatGPT", emoji: "🟡", model: "gpt-4o-mini" },
-          claude: { name: "BroadMind AI", emoji: "🟠", model: "claude-sonnet-4-20250514" },
+          claude: { name: "Claude", emoji: "🟠", model: "claude-sonnet-4-20250514" },
           kimi: { name: "Kimi", emoji: "🔵", model: "moonshot-v1-8k" },
         });
       });
@@ -498,7 +498,7 @@ export default function DoubtSolverPage() {
             </p>
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 text-xs text-slate-300">
-                <span className="text-emerald-400">✓</span> Multi-model: Gemini, ChatGPT, BroadMind AI, Kimi
+                <span className="text-emerald-400">✓</span> Multi-model: Gemini, ChatGPT, Claude, Kimi
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-300">
                 <span className="text-emerald-400">✓</span> Photo doubt solving

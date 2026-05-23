@@ -37,7 +37,7 @@ const PROVIDERS: Record<
 > = {
   gemini: { name: "Google Gemini", emoji: "🟢", model: "gemini-2.0-flash" },
   chatgpt: { name: "ChatGPT", emoji: "🟡", model: "gpt-4o-mini" },
-  claude: { name: "BroadMind AI", emoji: "🟠", model: "claude-sonnet-4-20250514" },
+  claude: { name: "Claude", emoji: "🟠", model: "claude-sonnet-4-20250514" },
   kimi: { name: "Kimi", emoji: "🔵", model: "moonshot-v1-8k" },
 };
 
