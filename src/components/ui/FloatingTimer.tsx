@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Timer, Play, Pause, X, Coffee, Brain, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
@@ -20,11 +21,15 @@ function pad(n: number) {
 }
 
 export default function FloatingTimer() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("focus");
   const [secondsLeft, setSecondsLeft] = useState(PRESETS.focus.minutes * 60);
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Hide on landing & login — driven by Next.js routing, not window
+  const hidden = pathname === "/" || pathname === "/login";
 
   const preset = PRESETS[mode];
   const total = preset.minutes * 60;
@@ -86,12 +91,7 @@ export default function FloatingTimer() {
   const secs = secondsLeft % 60;
   const isRunning = running;
 
-  // Don't render on landing or login
-  // (these don't have a nav bar, so the floating widget would look weird)
-  if (typeof window !== "undefined") {
-    const p = window.location.pathname;
-    if (p === "/" || p === "/login") return null;
-  }
+  if (hidden) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-40">
