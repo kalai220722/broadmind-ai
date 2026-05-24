@@ -4,11 +4,13 @@ import { ReactNode } from "react";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "./ThemeProvider";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
+import FloatingTimer from "@/components/ui/FloatingTimer";
 
 export default function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
       {children}
+      <FloatingTimer />
       <OnboardingModal />
       <Toaster
         position="top-right"

@@ -12,13 +12,16 @@ import {
   Target,
   Flame,
   TrendingUp,
+  Sparkles,
+  Loader2,
+  Brain,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import AppLayout from "@/components/layout/AppLayout";
 import GlassCard from "@/components/ui/GlassCard";
 import ShimmerButton from "@/components/ui/ShimmerButton";
 import { smallConfetti } from "@/lib/confetti";
-import { track } from "@/lib/personalization";
+import { track, useProfile } from "@/lib/personalization";
 
 interface Task {
   id: string;
@@ -57,11 +60,23 @@ function startOfWeek(d: Date) {
   return x;
 }
 
+interface AIPlan {
+  title: string;
+  rationale: string;
+  tasks: { title: string; subject: string; duration: number; type: string; priority: string; reason: string }[];
+  tip: string;
+}
+
 export default function PlannerPage() {
+  const profile = useProfile();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [cursor, setCursor] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
   const [showAdd, setShowAdd] = useState(false);
+  const [aiPlanning, setAiPlanning] = useState(false);
+  const [aiPlan, setAiPlan] = useState<AIPlan | null>(null);
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [availableMinutes, setAvailableMinutes] = useState(90);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -133,6 +148,76 @@ export default function PlannerPage() {
 
   const remove = (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // ── AI plan generation ──────────────────────────────────────────────
+  const generateAIPlan = async () => {
+    setAiPlanning(true);
+    try {
+      const topStyle = Object.entries(profile.style).sort((a, b) => b[1] - a[1])[0]?.[0] || "stepByStep";
+      const weak = Object.entries(profile.mastery).filter(([, v]) => v < 50).map(([k]) => k);
+      const strong = Object.entries(profile.mastery).filter(([, v]) => v >= 70).map(([k]) => k);
+
+      // Get nearest starred exam
+      const starred = JSON.parse(localStorage.getItem("bm-starred-exams") || "[]") as string[];
+      let targetExam = "";
+      let daysUntilExam: number | null = null;
+      if (starred.length > 0) {
+        const { EXAMS, nextOccurrence, daysUntil } = await import("@/lib/exams-data");
+        const nearest = EXAMS
+          .filter((e) => starred.includes(e.id))
+          .map((e) => ({ ...e, d: daysUntil(nextOccurrence(e.recurringMonth, e.recurringDay)) }))
+          .filter((e) => e.d !== null && e.d >= 0)
+          .sort((a, b) => (a.d || 9999) - (b.d || 9999))[0];
+        if (nearest) {
+          targetExam = nearest.name;
+          daysUntilExam = nearest.d ?? null;
+        }
+      }
+
+      const res = await fetch("/api/planner-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          level: profile.level,
+          pace: profile.pace,
+          style: topStyle,
+          weakTopics: weak.slice(0, 5),
+          strongTopics: strong.slice(0, 5),
+          availableMinutes,
+          targetExam,
+          daysUntilExam,
+          subjects: SUBJECTS,
+          language: profile.language,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setAiPlan(data);
+      setShowAIPanel(true);
+      toast.success("AI plan ready!");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to generate plan");
+    } finally {
+      setAiPlanning(false);
+    }
+  };
+
+  const acceptAIPlan = () => {
+    if (!aiPlan) return;
+    const newTasks: Task[] = aiPlan.tasks.map((t) => ({
+      id: newId(),
+      date: selectedDate,
+      title: t.title,
+      subject: t.subject,
+      duration: t.duration,
+      done: false,
+    }));
+    setTasks((prev) => [...prev, ...newTasks]);
+    setShowAIPanel(false);
+    setAiPlan(null);
+    smallConfetti();
+    toast.success(`Added ${newTasks.length} tasks to your day`);
   };
 
   // Stats
@@ -258,6 +343,125 @@ export default function PlannerPage() {
               <div className="text-[10px] text-slate-400 uppercase tracking-widest">Streak</div>
             </GlassCard>
           </div>
+
+          {/* AI coach */}
+          <GlassCard className="p-4" glow={!!aiPlan}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Brain size={14} className="text-violet-400" /> AI Study Coach
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Personalised plan based on your DNA + nearest starred exam
+                </p>
+              </div>
+            </div>
+
+            {!aiPlan ? (
+              <>
+                <div className="mb-3">
+                  <label className="text-[10px] uppercase tracking-widest text-slate-400 block mb-1">
+                    Time available today
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={30}
+                      max={240}
+                      step={15}
+                      value={availableMinutes}
+                      onChange={(e) => setAvailableMinutes(+e.target.value)}
+                      className="flex-1 accent-violet-500"
+                    />
+                    <span className="text-sm text-white tabular-nums w-16 text-right">
+                      {availableMinutes}m
+                    </span>
+                  </div>
+                </div>
+                <ShimmerButton onClick={generateAIPlan} disabled={aiPlanning} className="w-full" size="sm">
+                  {aiPlanning ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" /> Planning...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={12} /> Generate today&apos;s plan
+                    </>
+                  )}
+                </ShimmerButton>
+              </>
+            ) : (
+              <AnimatePresence>
+                {showAIPanel && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <h4 className="text-sm font-semibold text-white mb-1">{aiPlan.title}</h4>
+                    <p className="text-[11px] text-slate-400 mb-3 italic">{aiPlan.rationale}</p>
+                    <div className="space-y-1.5 mb-3 max-h-64 overflow-y-auto scrollbar-thin">
+                      {aiPlan.tasks.map((t, i) => (
+                        <div
+                          key={i}
+                          className="p-2 rounded-lg bg-white/5 border border-white/10 text-xs"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-medium text-white">{t.title}</div>
+                            <span className="text-[9px] uppercase tracking-widest text-slate-400 flex-shrink-0">
+                              {t.duration}m
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span
+                              className={`text-[9px] px-1.5 py-0.5 rounded-full bg-gradient-to-r ${
+                                SUBJECT_COLORS[t.subject] || "from-slate-500 to-slate-600"
+                              } text-white`}
+                            >
+                              {t.subject}
+                            </span>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                                t.priority === "high"
+                                  ? "bg-rose-500/20 text-rose-300"
+                                  : t.priority === "medium"
+                                  ? "bg-amber-500/20 text-amber-300"
+                                  : "bg-slate-500/20 text-slate-300"
+                              }`}
+                            >
+                              {t.priority}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">{t.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 mb-3">
+                      <p className="text-[10px] uppercase tracking-widest text-cyan-300 mb-0.5">
+                        💡 Tip
+                      </p>
+                      <p className="text-xs text-slate-200">{aiPlan.tip}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          setAiPlan(null);
+                          setShowAIPanel(false);
+                        }}
+                        className="px-3 py-2 rounded-lg text-xs text-slate-300 bg-white/5 hover:bg-white/10"
+                      >
+                        Discard
+                      </button>
+                      <ShimmerButton onClick={acceptAIPlan} size="sm">
+                        Add to day
+                      </ShimmerButton>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+          </GlassCard>
 
           {/* Day tasks */}
           <GlassCard className="p-4">
